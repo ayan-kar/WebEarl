@@ -1,10 +1,10 @@
 import Order from "../models/order.js";
 import Product from "../models/product.js";
 
-// POST /api/orders (Customer: Create Order)
+// POST /api/orders 
 export const createOrder = async (req, res) => {
   try {
-    const { items } = req.body; // array of { productId, quantity }
+    const { items } = req.body; 
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Cart cannot be empty." });
@@ -27,7 +27,6 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Track vendor for order routing
       if (!vendorId) {
         vendorId = product.vendor;
       }
@@ -44,12 +43,11 @@ export const createOrder = async (req, res) => {
         total: itemTotal,
       });
 
-      // Deduct stock safely
       product.stock -= item.quantity;
       await product.save();
     }
 
-    const totalAmount = subTotal; // simplified without tax/shipping for basic flow
+    const totalAmount = subTotal; 
 
     const order = await Order.create({
       customer: req.user.id,
@@ -66,7 +64,7 @@ export const createOrder = async (req, res) => {
   }
 };
 
-// GET /api/orders/my-orders (Customer: View their own orders)
+// GET /api/orders/my-orders 
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ customer: req.user.id })
@@ -78,7 +76,7 @@ export const getMyOrders = async (req, res) => {
   }
 };
 
-// GET /api/orders/vendor-orders (Vendor: View incoming orders for their products)
+// GET /api/orders/vendor-orders
 export const getVendorOrders = async (req, res) => {
   try {
     const query = req.user.role === "admin" ? {} : { vendor: req.user.id };
@@ -91,7 +89,7 @@ export const getVendorOrders = async (req, res) => {
   }
 };
 
-// PATCH /api/orders/:id/status (Vendor/Admin: Update order status)
+// PATCH /api/orders/:id/status 
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;

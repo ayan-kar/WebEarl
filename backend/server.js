@@ -35,11 +35,11 @@ const MONGO_URI = process.env.MONGODB_URI
 mongoose
   .connect(MONGO_URI)
   .then(() => {
-    console.log("Connected to MongoDB successfully");
+    console.log(" MongoDB done");
     app.listen(PORT, () => {
-      console.log(`Backend server running on http://localhost:${PORT}`);
+      console.log(`Backend  on http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
-    console.error("MongoDB connection failed:", err.message);
+    console.error("DB failed:", err.message);
   });
