@@ -8,7 +8,9 @@ import { v4 as uuidv4 } from "uuid";
 
 dotenv.config();
 
-const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/inventory_db";
+console.log(process.env.MONGODB_URI )
+
+const MONGO_URI = process.env.MONGODB_URI ;
 
 const seedDatabase = async () => {
   try {
