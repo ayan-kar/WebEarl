@@ -1,401 +1,397 @@
-Overview
+# Inventory & Order Management Platform — API Documentation
+
+**Written by:** Ayan  
+**Project:** MERN Stack Assignment (Inventory & Order Management)  
+**Backend:** Node.js + Express + MongoDB (Mongoose) + JWT  
+**Base URL:** `http://localhost:5000`  
+> **Note:** This document describes what is **actually implemented** in the backend. Known gaps are listed at the end.
+
+---
+
+## Table of Contents
+1. [Overview](#1-overview)
+2. [Authentication (How It Works)](#2-authentication-how-it-works)
+3. [Roles](#3-roles)
+4. [Endpoints — Health](#4-endpoints--health)
+5. [Endpoints — Auth](#5-endpoints--auth)
+6. [Endpoints — Products](#6-endpoints--products)
+7. [Endpoints — Orders](#7-endpoints--orders)
+8. [Data Models (Database Schemas)](#8-data-models-database-schemas)
+9. [HTTP Status Codes Used](#9-http-status-codes-used)
+10. [Known Limitations / Not Yet Implemented](#10-known-limitations--not-yet-implemented)
+
+---
+
+## 1. Overview
 This is the backend API for a multi-vendor inventory and order management system. Vendors create products, customers browse and order them, and vendors/admins manage the order lifecycle.
 
-Architecture
-The backend is organized as:
+### Project Architecture:
+- `server.js` → App entry point, MongoDB connection, health check, centralized error handler.
+- `routes/` → URL routing (`authRoutes`, `productRoutes`, `orderRoutes`).
+- `controllers/` → Request logic (`authController`, `productController`, `orderController`).
+- `models/` → Mongoose schemas (`user`, `product`, `order`).
+- `middleware/auth.js` → JWT authentication + role authorization.
+- `seed.js` → Sample data script.
 
-server.js → app entry point, MongoDB connection, health check, centralized error handler
-routes/ → URL routing (authRoutes, productRoutes, orderRoutes)
-controllers/ → request logic (authController, productController, orderController)
-models/ → Mongoose schemas (user, product, order)
-middleware/auth.js → JWT authentication + role authorization
-seed.js → sample data script
-General Rules
-All JSON request/response bodies
-All protected endpoints require a JWT token sent in the header:
-
-
+All communication uses JSON request/response bodies. All protected endpoints require a JWT token sent in the header:
+```http
 Authorization: Bearer <token>
-Authentication (How it Works)
-Passwords are hashed with bcrypt (salt rounds = 10) before saving
-On login, the server signs a JWT containing the user's id, role, and email. The token expires after 1 day
-The authenticate middleware verifies the token on every protected request and attaches the decoded user to req.user
-The authorize(...roles) middleware then checks that the user's role is allowed to access that endpoint (returns 403 otherwise)
-All permission checks are done on the BACKEND — the frontend cannot bypass them
-Roles
-Role	Permissions
-admin	Full access; can manage any product/order
-vendor	Can create/manage OWN products; see and update orders assigned to them
-customer	Can browse products; place orders; view own order history
-Endpoints — Health
-GET /api/health
-Public
+```
 
-Purpose: Check that the server is running.
+---
 
-Response:
+## 2. Authentication (How It Works)
+- Passwords are hashed with `bcryptjs` (salt rounds = 10) before saving.
+- On login, the server signs a JWT containing the user's `id`, `role`, and `email`. The token expires after **1 day**.
+- The `authenticate` middleware verifies the token on every protected request and attaches the decoded user to `req.user`.
+- The `authorize(...roles)` middleware then checks that the user's role is allowed to access that endpoint (returns `403 Forbidden` otherwise).
+- **All permission checks are done on the backend** — the frontend cannot bypass them.
 
+---
 
+## 3. Roles
+- `admin` → Full access, can manage any product/order across the platform.
+- `vendor` → Can create/manage their **own** products, view and update orders assigned to them.
+- `customer` → Can browse products, place orders, and view their own order history.
 
-200 → { "status": "ok", "message": "Server is healthy and running" }
-Endpoints — Auth
-POST /api/auth/register
-Public
+---
 
-Purpose: Create a new user account.
+## 4. Endpoints — Health
 
-Body:
+### `GET /api/health`
+- **Access:** Public
+- **Purpose:** Check that the server is running.
+- **Success Response (`200 OK`):**
+```json
+{
+  "status": "ok",
+  "message": "Server is healthy and running"
+}
+```
 
-json
+---
 
+## 5. Endpoints — Auth
 
+### `POST /api/auth/register`
+- **Access:** Public
+- **Purpose:** Create a new user account.
+- **Request Body:**
+```json
 {
   "email": "you@mail.com",
   "password": "secret",
   "role": "vendor"
 }
-Field Rules:
-
-email and password are required
-role is optional; must be one of "admin" | "vendor" | "customer". Anything invalid/missing defaults to "customer"
-Success:
-
-
-
-201 → {
+```
+  - `email` and `password` are required.
+  - `role` is optional; must be one of `"admin"` | `"vendor"` | `"customer"`. Anything invalid or missing defaults to `"customer"`.
+- **Success Response (`201 Created`):**
+```json
+{
   "message": "User registered successfully.",
   "user": {
-    "id": "...",
-    "email": "...",
-    "role": "..."
+    "id": "670ab1234567890abcdef123",
+    "email": "you@mail.com",
+    "role": "vendor"
   }
 }
-Errors:
+```
+- **Error Responses:**
+  - `400 Bad Request` → Email or password missing.
+  - `400 Bad Request` → An account with this email already exists.
+- **Note:** Password is stored **only** as a bcrypt hash — never as plain text. Email is normalized to lowercase.
 
-400 → email or password missing
-400 → an account with this email already exists
-Notes:
+---
 
-Password is stored ONLY as a bcrypt hash — never as plain text
-Email is normalized to lowercase
-POST /api/auth/login
-Public
-
-Purpose: Log in and receive a JWT token.
-
-Body:
-
-json
-
-
+### `POST /api/auth/login`
+- **Access:** Public
+- **Purpose:** Log in and receive a JWT token.
+- **Request Body:**
+```json
 {
   "email": "you@mail.com",
   "password": "secret"
 }
-Success:
-
-
-
-200 → {
+```
+- **Success Response (`200 OK`):**
+```json
+{
   "message": "Login successful.",
-  "token": "eyJhbGc...",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "...",
-    "email": "...",
-    "role": "..."
+    "id": "670ab1234567890abcdef123",
+    "email": "you@mail.com",
+    "role": "vendor"
   }
 }
-Errors:
+```
+- **Error Responses:**
+  - `400 Bad Request` → Email or password missing.
+  - `401 Unauthorized` → Invalid email or password.
+- **Note:** Use the returned token in the `Authorization` header for every protected endpoint. Token expires in 1 day.
 
-400 → email or password missing
-401 → invalid email or password
-Notes:
+---
 
-Use the returned token in the Authorization header for every protected endpoint
-Token expires in 1 day
-Endpoints — Products
-GET /api/products
-Public
+## 6. Endpoints — Products
 
-Purpose: Browse the product catalog with search, filter, sort, and pagination. Only ACTIVE products are returned.
-
-Query Parameters (all optional):
-
-Parameter	Type	Description
-search	String	Matches product NAME or SKU (case-insensitive)
-category	String	Exact category match
-minPrice	Number	Price >= value
-maxPrice	Number	Price <= value
-sort	String	"price_asc" | "price_desc" | "stock" (default: newest first, createdAt desc)
-page	Number	Page number, default 1
-limit	Number	Items per page, default 10
-Example Request:
-
-
-
-/api/products?search=mouse&category=Electronics&minPrice=10&maxPrice=100&sort=price_asc&page=1&limit=10
-Success:
-
-
-
-200 → {
-  "total": 42,           // total matching products
+### `GET /api/products`
+- **Access:** Public
+- **Purpose:** Browse the product catalog with search, filter, sort, and pagination. Only **active** products are returned.
+- **Query Parameters (all optional):**
+  - `search` → Matches product `name` or `sku` (case-insensitive regex).
+  - `category` → Exact category match.
+  - `minPrice` → Price >= value.
+  - `maxPrice` → Price <= value.
+  - `sort` → `"price_asc"` | `"price_desc"` | `"stock"` (default: newest first, `createdAt` desc).
+  - `page` → Page number (default: `1`).
+  - `limit` → Items per page (default: `10`).
+- **Example:**
+```http
+GET /api/products?search=mouse&category=Electronics&minPrice=10&maxPrice=100&sort=price_asc&page=1&limit=10
+```
+- **Success Response (`200 OK`):**
+```json
+{
+  "total": 42,
   "page": 1,
-  "pages": 5,            // total pages
-  "products": [ ... ]    // each product includes vendor email
-}
-Notes:
-
-Vendor info is populated (only the vendor's email is returned, not their whole record)
-GET /api/products/:id
-Public
-
-Purpose: Get full details of one product.
-
-Success:
-
-
-
-200 → product object (includes vendor email)
-Errors:
-
-404 → product not found
-POST /api/products
-Vendor/Admin only — requires token
-
-Purpose: Create a new product. The logged-in vendor becomes the product owner automatically.
-
-Body:
-
-json
-
-
-{
-  "name": "Wireless Mouse",        // required
-  "description": "Ergonomic mouse",// optional
-  "sku": "WM-1001",                // required, unique
-  "category": "Electronics",        // required
-  "price": 25.99,                  // required, >= 0
-  "stock": 100                     // required, >= 0
-}
-Success:
-
-
-
-201 → {
-  "message": "Product created successfully",
-  "product": { ... }
-}
-Errors:
-
-401 → no/invalid token
-403 → logged-in user is not a vendor/admin
-400 → missing required fields
-400 → a product with this SKU already exists (SKUs must be unique across the whole platform)
-PUT /api/products/:id
-Vendor/Admin only — requires token
-
-Purpose: Update a product (price, stock, name, description, category, sku). Vendors can update ONLY their own products; admins can update any.
-
-Body:
-
-json
-
-
-{
-  // any of the product fields you want to change
-}
-Success:
-
-
-
-200 → {
-  "message": "Product updated successfully",
-  "product": { ...updated... }
-}
-Errors:
-
-404 → product not found
-403 → vendor does not own this product
-Notes:
-
-The "vendor" field is stripped from the request body, so ownership can never be transferred or forged through this endpoint
-DELETE /api/products/:id
-Vendor/Admin only — requires token
-
-Purpose: Deactivate a product (SOFT delete — the product stays in the database but is marked inactive and no longer appears in the public catalog or in new orders).
-
-Success:
-
-
-
-200 → { "message": "Product deactivated successfully" }
-Errors:
-
-404 → product not found
-403 → vendor does not own this product
-Endpoints — Orders
-POST /api/orders
-Customer only — requires token
-
-Purpose: Place an order from a shopping cart.
-
-Body:
-
-json
-
-
-{
-  "items": [
+  "pages": 5,
+  "products": [
     {
-      "productId": "507f1f77bcf86cd799439011",
-      "quantity": 2
-    },
-    {
-      "productId": "507f1f77bcf86cd799439012",
-      "quantity": 1
+      "_id": "670ab1234567890abcdef456",
+      "name": "Wireless Mouse",
+      "description": "Ergonomic mouse",
+      "sku": "WM-1001",
+      "category": "Electronics",
+      "price": 25.99,
+      "stock": 100,
+      "vendor": {
+        "_id": "670ab1234567890abcdef123",
+        "email": "vendor@example.com"
+      },
+      "isActive": true
     }
   ]
 }
-Business Rules Enforced on the Backend:
+```
+- **Note:** Vendor info is populated (only the vendor's email is returned, not their full user record).
 
-Prices are ALWAYS taken from the database at order time. The frontend price is ignored — a customer cannot pay a tampered/fake price
-Inactive products are rejected
-Quantity must be within available stock (rejected otherwise)
-The order starts with status "Pending"
-Success:
+---
 
+### `GET /api/products/:id`
+- **Access:** Public
+- **Purpose:** Get full details of one single product.
+- **Success Response (`200 OK`):** Product object with populated vendor email.
+- **Error Response (`404 Not Found`):** Product not found.
 
+---
 
-201 → {
+### `POST /api/products`
+- **Access:** Vendor / Admin only (Requires Bearer Token)
+- **Purpose:** Create a new product. The logged-in vendor becomes the product owner automatically.
+- **Request Body:**
+```json
+{
+  "name": "Wireless Mouse",
+  "description": "Ergonomic mouse",
+  "sku": "WM-1001",
+  "category": "Electronics",
+  "price": 25.99,
+  "stock": 100
+}
+```
+- **Success Response (`201 Created`):**
+```json
+{
+  "message": "Product created successfully",
+  "product": { ... }
+}
+```
+- **Error Responses:**
+  - `401 Unauthorized` → No or invalid token.
+  - `403 Forbidden` → User is not a vendor or admin.
+  - `400 Bad Request` → Missing required fields.
+  - `400 Bad Request` → A product with this SKU already exists (SKUs must be unique).
+
+---
+
+### `PUT /api/products/:id`
+- **Access:** Vendor / Admin only (Requires Bearer Token)
+- **Purpose:** Update a product (`price`, `stock`, `name`, `description`, `category`, `sku`). Vendors can update **only their own** products; admins can update any product.
+- **Request Body:** Any of the fields you want to update.
+- **Success Response (`200 OK`):**
+```json
+{
+  "message": "Product updated successfully",
+  "product": { ... }
+}
+```
+- **Error Responses:**
+  - `404 Not Found` → Product not found.
+  - `403 Forbidden` → Vendor does not own this product.
+- **Note:** The `vendor` field is stripped from updates, preventing ownership hijacking.
+
+---
+
+### `DELETE /api/products/:id`
+- **Access:** Vendor / Admin only (Requires Bearer Token)
+- **Purpose:** Deactivate a product (**soft delete** — the product stays in the database but `isActive` is set to `false`, removing it from the public catalog and new orders).
+- **Success Response (`200 OK`):**
+```json
+{
+  "message": "Product deactivated successfully"
+}
+```
+- **Error Responses:**
+  - `404 Not Found` → Product not found.
+  - `403 Forbidden` → Vendor does not own this product.
+
+---
+
+## 7. Endpoints — Orders
+
+### `POST /api/orders`
+- **Access:** Customer only (Requires Bearer Token)
+- **Purpose:** Place an order from a shopping cart.
+- **Request Body:**
+```json
+{
+  "items": [
+    { "productId": "670ab1234567890abcdef456", "quantity": 2 },
+    { "productId": "670ab1234567890abcdef789", "quantity": 1 }
+  ]
+}
+```
+- **Business Rules Enforced on Backend:**
+  - **Authoritative Pricing:** Prices are **always** taken from the database at order time. Frontend prices are ignored to prevent tampering.
+  - **Active State Check:** Inactive products are rejected.
+  - **Stock Check:** Quantity must be within available stock.
+  - **Stock Deduction:** Available stock is decremented immediately upon order placement.
+  - **Initial Status:** The order starts with status `"Pending"`.
+- **Success Response (`201 Created`):**
+```json
+{
   "message": "Order placed successfully",
   "order": { ... }
 }
-Errors:
+```
+- **Error Responses:**
+  - `400 Bad Request` → Empty cart or invalid items array.
+  - `400 Bad Request` → Product not found or inactive.
+  - `400 Bad Request` → Insufficient stock (`"Available: X"` is included).
+- **Note:** Current design assigns the first product's vendor as the order's vendor (single-vendor orders).
 
-400 → empty cart / bad items array
-400 → product missing or inactive
-400 → insufficient stock ("Available: X" is included)
-Notes:
+---
 
-Current design supports items from a single vendor per order (the first product's vendor is assigned as the order's vendor). See Limitations
-GET /api/orders/my-orders
-Customer only — requires token
+### `GET /api/orders/my-orders`
+- **Access:** Customer only (Requires Bearer Token)
+- **Purpose:** The logged-in customer views their **own** order history, sorted newest first.
+- **Success Response (`200 OK`):** Array of order objects, each including the vendor's email.
 
-Purpose: The logged-in customer views their OWN order history, newest first.
+---
 
-Success:
+### `GET /api/orders/vendor-orders`
+- **Access:** Vendor / Admin only (Requires Bearer Token)
+- **Purpose:** 
+  - **Vendors** see incoming orders routed to them (orders containing their products).
+  - **Admins** see all orders in the entire system.
+- **Success Response (`200 OK`):** Array of order objects, each including customer email.
+- **Note:** A vendor can **never** see another vendor's orders — filtered strictly by `req.user.id`.
 
+---
 
-
-200 → [ order objects, each includes vendor email ]
-GET /api/orders/vendor-orders
-Vendor/Admin only — requires token
-
-Purpose: Vendors see orders routed to them (orders containing their products). Admins see ALL orders in the system.
-
-Success:
-
-
-
-200 → [ order objects, each includes customer email ]
-Notes:
-
-A vendor can NEVER see another vendor's orders — the query is filtered by req.user.id on the server side
-PATCH /api/orders/:id/status
-Vendor/Admin only — requires token
-
-Purpose: Move an order through its lifecycle: Pending → Confirmed → Processing → Shipped → Delivered or set it to "Cancelled".
-
-Body:
-
-json
-
-
+### `PATCH /api/orders/:id/status`
+- **Access:** Vendor / Admin only (Requires Bearer Token)
+- **Purpose:** Move an order through its lifecycle:
+  `Pending` → `Confirmed` → `Processing` → `Shipped` → `Delivered` or set it to `Cancelled`.
+- **Request Body:**
+```json
 {
   "status": "Shipped"
 }
-Allowed Values:
-
-Pending
-Confirmed
-`Processing
-Shipped
-Delivered
-Cancelled
-Success:
-
-
-
-200 → {
+```
+- **Allowed Values:** `"Pending"` | `"Confirmed"` | `"Processing"` | `"Shipped"` | `"Delivered"` | `"Cancelled"`
+- **Success Response (`200 OK`):**
+```json
+{
   "message": "Order status updated to Shipped",
   "order": { ... }
 }
-Errors:
+```
+- **Error Responses:**
+  - `400 Bad Request` → Status value is not in the allowed list.
+  - `404 Not Found` → Order not found.
+  - `403 Forbidden` → Vendor does not own this order.
+- **Stock Restoration on Cancellation:**
+  - When an order is updated to `"Cancelled"`, the stock for every item is added back to its respective product using atomic `$inc`.
+  - Stock is restored **only** if the order was not already cancelled (`order.status !== "Cancelled"`), preventing duplicate stock restoration on retries.
 
-400 → status value not in the allowed list
-404 → order not found
-403 → vendor does not own this order
-Stock Restoration on Cancellation:
+---
 
-When an order is set to "Cancelled", the stock of every item is added back to its product (via an atomic $inc operation)
-Stock is restored ONLY if the order was not already cancelled (the check order.status !== "Cancelled" prevents double restoration if cancellation is retried)
-Data Models (Database Schemas)
-User
-Field	Type	Notes
-email	String	Required, unique, stored lowercase
-passwordHash	String	Required (bcrypt hash, never plain text)
-role	String	"admin" | "vendor" | "customer", default "customer"
-Product
-Field	Type	Notes
-name	String	Required
-description	String	Optional
-sku	String	Required, unique, trimmed
-category	String	Required
-price	Number	Required, min 0
-stock	Number	Required, min 0 (can never go negative)
-vendor	ObjectId → User	Required (the owning vendor)
-createdAt	Date	Added automatically by Mongoose timestamps
-updatedAt	Date	Added automatically by Mongoose timestamps
-Order
-Field	Type	Notes
-customer	ObjectId → User	Required
-vendor	ObjectId → User	Required (vendor the order belongs to)
-items	Array	Array of item objects (see below)
-subTotal	Number	Required, min 0 (sum of item totals)
-tax	Number	Default 0
-shippingFee	Number	Default 0
-totalAmount	Number	Required, min 0 (currently = subTotal)
-status	String	Pending | Confirmed | Processing | Shipped | Delivered | Cancelled, default "Pending"
-payment	ObjectId → Payment	Placeholder for future payment module; not yet implemented
-Order Item (nested in items array)
-Field	Type	Notes
-product	ObjectId → Product	Reference to the product
-name	String	Snapshot of product name
-sku	String	Snapshot of product SKU
-unitPrice	Number	Snapshot, min 0
-quantity	Number	Min 1
-total	Number	unitPrice × quantity
-HTTP Status Codes Used
-Code	Meaning
-200	Request succeeded (GET, PUT, DELETE, PATCH)
-201	Resource created (register, create product, place order)
-400	Validation error / bad input / business rule rejected
-401	Missing, invalid, or expired token (unauthenticated)
-403	Authenticated but not allowed (wrong role / not the owner)
-404	Product or order not found
-500	Unexpected server error (handled by centralized middleware)
-Known Limitations / Not Yet Implemented
-Because of the time limit, the following requirement items are NOT yet done in this version:
+## 8. Data Models (Database Schemas)
 
-Payment simulation (Module E) — the Order model has a payment placeholder field, but no payment endpoints exist
-Dashboard & analytics (Module F) — no aggregation/analytics endpoints yet
-Order history/activity log (Module D) — status changes update the status field but are not yet recorded as a separate log
-Strict status transition validation (Module D) — any allowed status can be set from any other; forward-only transitions are not enforced yet
-Idempotency keys for order creation (Module C) — retrying the same request can currently create a duplicate order
-MongoDB transactions — stock deduction happens per product save rather than inside a multi-document transaction
-Refresh tokens & logout — only a single access token (1 day) is issued; there is no refresh flow or token blacklist
-Vendor activation/deactivation by admin (Platform Admin role)
-Automated tests (Module I) — not yet written
-Frontend (Module G) — not yet built
-These are honest gaps relative to the full requirement document and are listed here for the submission's "Known limitations" section.
+### User
+| Field | Type | Details |
+| :--- | :--- | :--- |
+| `email` | `String` | Required, unique, stored lowercase, trimmed |
+| `passwordHash` | `String` | Required (bcrypt hash, never plain text) |
+| `role` | `String` | Enum: `"admin"`, `"vendor"`, `"customer"` (default: `"customer"`) |
+| `createdAt` / `updatedAt` | `Date` | Managed automatically by Mongoose timestamps |
+
+### Product
+| Field | Type | Details |
+| :--- | :--- | :--- |
+| `name` | `String` | Required |
+| `description`| `String` | Optional |
+| `sku` | `String` | Required, unique across platform, trimmed |
+| `category` | `String` | Required |
+| `price` | `Number` | Required, min: 0 |
+| `stock` | `Number` | Required, min: 0 |
+| `vendor` | `ObjectId` | Ref: `User`, required (owning vendor) |
+| `isActive` | `Boolean`| Default: `true` (used for soft deletes) |
+| `createdAt` / `updatedAt` | `Date` | Managed automatically by Mongoose timestamps |
+
+### Order
+| Field | Type | Details |
+| :--- | :--- | :--- |
+| `customer` | `ObjectId` | Ref: `User`, required |
+| `vendor` | `ObjectId` | Ref: `User`, required (owning vendor) |
+| `items` | `Array` | Embedded order items: `product`, `name`, `sku`, `unitPrice` (snapshot), `quantity`, `total` |
+| `subTotal` | `Number` | Required, min: 0 (sum of item totals) |
+| `tax` | `Number` | Default: 0 |
+| `shippingFee`| `Number` | Default: 0 |
+| `totalAmount`| `Number` | Required, min: 0 (currently equals `subTotal`) |
+| `status` | `String` | Enum: `"Pending"`, `"Confirmed"`, `"Processing"`, `"Shipped"`, `"Delivered"`, `"Cancelled"` (default: `"Pending"`) |
+| `payment` | `ObjectId` | Ref: `Payment` (placeholder for future payment module) |
+| `createdAt` / `updatedAt` | `Date` | Managed automatically by Mongoose timestamps |
+
+---
+
+## 9. HTTP Status Codes Used
+
+| Code | Meaning | Typical Usage |
+| :--- | :--- | :--- |
+| `200 OK` | Succeeded | `GET`, `PUT`, `DELETE`, `PATCH` operations |
+| `201 Created` | Resource Created | `POST /register`, `POST /products`, `POST /orders` |
+| `400 Bad Request` | Validation Error | Missing fields, bad format, business rule rejection, duplicate SKU |
+| `401 Unauthorized` | Unauthenticated | Missing, invalid, or expired JWT token |
+| `403 Forbidden` | Access Denied | Authenticated user lacks permission (wrong role / not owner) |
+| `404 Not Found` | Not Found | Target product or order doesn't exist |
+| `500 Server Error` | Server Exception | Centralized error handler catches unhandled exceptions |
+
+---
+
+## 10. Known Limitations / Not Yet Implemented
+
+Because of the 3-hour time constraint, the following items from `req.txt` are **not** implemented in this version:
+
+1. **Payment Simulation (Module E):** The `Order` model includes a payment placeholder, but simulated payment endpoints do not exist yet.
+2. **Dashboard & Analytics (Module F):** No aggregation endpoints for admin/vendor dashboards yet.
+3. **Order Activity Log (Module D):** Status changes modify the `status` field directly without saving a separate audit log collection.
+4. **Strict Status Transitions (Module D):** Forward-only state transitions are not strictly locked down (any allowed status can be set from another).
+5. **Idempotency Keys (Module C):** Duplicate order prevention on network retry is not yet implemented.
+6. **MongoDB Multi-Document Transactions:** Stock deduction uses sequential model updates rather than an atomic session transaction.
+7. **Refresh Tokens & Session Invalidation:** Only a single 1-day access token is used; no refresh token rotation or blacklist exists.
+8. **Vendor Activation/Deactivation by Admin:** Admin management endpoints for toggling vendor statuses are not implemented.
+9. **Automated Tests (Module I):** Jest/Supertest automated tests are not yet included.
+10. **Frontend (Module G):** No UI screens built.
